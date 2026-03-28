@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kello-Oppi 🕐</title>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --sky-dawn:    #1a1a4e;
+    --sky-morning: #ff9a3c;
+    --sky-day:     #87ceeb;
+    --sky-noon:    #4fc3f7;
+    --sky-eve:     #ff6b6b;
+    --sky-night:   #1a1a4e;
+
+    --card-bg: rgba(255,255,255,0.92);
+    --shadow: 0 8px 32px rgba(0,0,0,0.18);
+    --radius: 24px;
+    --accent: #ffce3a;
+    --accent2: #ff6b6b;
+    --text-dark: #1e1e3a;
+    --text-mid: #444466;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Nunito', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 12px 40px;
+    transition: background 1.2s ease;
+    background: var(--sky-day);
+    overflow-x: hidden;
+  }
+
+  /* Sky gradient based on time-of-day */
+  body.yö        { background: linear-gradient(180deg,#0b0b2e 0%,#1a1a4e 100%); }
+  body.aamuyö    { background: linear-gradient(180deg,#0d0d3b 0%,#2d1b69 100%); }
+  body.aamu      { background: linear-gradient(180deg,#ff6b35 0%,#ffce3a 100%); }
+  body.aamupäivä { background: linear-gradient(180deg,#87ceeb 0%,#c8e6fa 100%); }
+  body.päivä     { background: linear-gradient(180deg,#4fc3f7 0%,#81d4fa 100%); }
+  body.iltapäivä { background: linear-gradient(180deg,#64b5f6 0%,#90caf9 100%); }
+  body.ilta      { background: linear-gradient(180deg,#ff8a65 0%,#ff6b6b 100%); }
+
+  /* Stars */
+  .stars { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; opacity: 0; transition: opacity 1.2s; }
+  body.yö .stars, body.aamuyö .stars { opacity: 1; }
+  .star { position: absolute; background: white; border-radius: 50%; animation: twinkle 2s infinite alternate; }
+  @keyframes twinkle { from { opacity: 0.3; transform: scale(1); } to { opacity: 1; transform: scale(1.3); } }
+
+  h1 {
+    font-family: 'Baloo 2', cursive;
+    font-size: clamp(2rem, 6vw, 3rem);
+    font-weight: 800;
+    color: white;
+    text-shadow: 0 3px 12px rgba(0,0,0,0.3);
+    margin-bottom: 8px;
+    position: relative;
+    z-index: 1;
+    letter-spacing: -1px;
+  }
+
+  .subtitle {
+    color: rgba(255,255,255,0.9);
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin-bottom: 24px;
+    position: relative;
+    z-index: 1;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  }
+
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    width: 100%;
+    max-width: 760px;
+    position: relative;
+    z-index: 1;
+  }
+
+  @media (max-width: 600px) {
+    .main-grid { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    transition: transform 0.2s;
+  }
+  .card:hover { transform: translateY(-3px); }
+
+  .card-title {
+    font-family: 'Baloo 2', cursive;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    letter-spacing: 0.3px;
+  }
+
+  /* ---- ANALOG CLOCK ---- */
+  .analog-card { grid-row: span 2; }
+
+  #clock-svg {
+    width: min(260px, 80vw);
+    height: min(260px, 80vw);
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    filter: drop-shadow(0 6px 18px rgba(0,0,0,0.15));
+  }
+  #clock-svg:active { cursor: grabbing; }
+
+  .now-btn {
+    background: linear-gradient(135deg, #ffce3a, #ff9a3c);
+    border: none;
+    border-radius: 50px;
+    padding: 10px 28px;
+    font-family: 'Baloo 2', cursive;
+    font-size: 1rem;
+    font-weight: 700;
+    color: white;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(255,154,60,0.4);
+    transition: transform 0.15s, box-shadow 0.15s;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .now-btn:hover { transform: scale(1.05); box-shadow: 0 6px 20px rgba(255,154,60,0.5); }
+  .now-btn:active { transform: scale(0.97); }
+
+  /* ---- DIGITAL CLOCK ---- */
+  .digital-display {
+    font-family: 'Baloo 2', cursive;
+    font-size: clamp(2.8rem, 8vw, 4rem);
+    font-weight: 800;
+    color: var(--text-dark);
+    letter-spacing: 2px;
+    background: linear-gradient(135deg, #f8f0ff, #e8f4ff);
+    border-radius: 16px;
+    padding: 14px 28px;
+    box-shadow: inset 0 2px 8px rgba(0,0,0,0.08);
+    min-width: 180px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    text-align: center;
+  }
+  .digital-sep {
+    color: #aaa;
+    align-self: start;
+    justify-self: center;
+    padding: 0 2px;
+    letter-spacing: 0;
+  }
+  .digital-label {
+    font-size: 0.28em;
+    color: #999;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    line-height: 1.4;
+    text-transform: uppercase;
+  }
+
+  /* ---- TIME OF DAY ---- */
+  .tod-badge {
+    font-family: 'Baloo 2', cursive;
+    font-size: 1.5rem;
+    font-weight: 800;
+    border-radius: 50px;
+    padding: 10px 26px;
+    color: white;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    transition: background 1s, transform 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: clamp(1.1rem, 4vw, 1.6rem);
+  }
+  .tod-badge .tod-emoji { font-size: 1.6em; }
+
+  /* ---- SPOKEN TIME ---- */
+  .spoken-time {
+    font-family: 'Baloo 2', cursive;
+    font-size: clamp(1.1rem, 3.5vw, 1.45rem);
+    font-weight: 700;
+    color: var(--text-dark);
+    text-align: center;
+    line-height: 1.5;
+  }
+  .spoken-time .highlight {
+    background: linear-gradient(135deg, #ffce3a, #ffa726);
+    border-radius: 8px;
+    padding: 2px 8px;
+    color: white;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  }
+  .spoken-time .highlight2 {
+    background: linear-gradient(135deg, #64b5f6, #42a5f5);
+    border-radius: 8px;
+    padding: 2px 8px;
+    color: white;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  }
+
+  /* minute markers label */
+  .drag-hint {
+    font-size: 0.82rem;
+    color: #999;
+    font-weight: 600;
+    display: flex; align-items: center; gap: 5px;
+  }
+
+  /* active hand highlight pulse */
+  @keyframes pulse-ring {
+    0% { r: 6; opacity: 1; }
+    100% { r: 14; opacity: 0; }
+  }
+</style>
+</head>
+<body class="päivä">
+
+<!-- Stars background -->
+<div class="stars" id="stars"></div>
+
+<h1>🕐 Kello-Oppi</h1>
+<p class="subtitle">Opi lukemaan kelloa — pyöritä viisareita!</p>
+
+<div class="main-grid">
+
+  <!-- Analoginen kello -->
+  <div class="card analog-card">
+    <div class="card-title">⏰ Analoginen kello</div>
+    <svg id="clock-svg" viewBox="0 0 260 260" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="faceGrad" cx="50%" cy="45%" r="60%">
+          <stop offset="0%" stop-color="#fffef8"/>
+          <stop offset="100%" stop-color="#f0ece0"/>
+        </radialGradient>
+        <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="rgba(0,0,0,0.15)"/>
+        </filter>
+      </defs>
+      <!-- Clock rim -->
+      <circle cx="130" cy="130" r="124" fill="#e8dfc8" filter="url(#shadow)"/>
+      <circle cx="130" cy="130" r="119" fill="url(#faceGrad)"/>
+      <circle cx="130" cy="130" r="116" fill="none" stroke="#d4c9a8" stroke-width="1.5"/>
+
+      <!-- Hour markers -->
+      <g id="hour-markers"></g>
+      <!-- Minute markers (small dots for non-5-min) -->
+      <g id="minute-markers"></g>
+      <!-- Minute labels (5,10,...,60) -->
+      <g id="minute-labels"></g>
+      <!-- Numbers (12h + 24h) -->
+      <g id="numbers"></g>
+
+      <!-- Hands -->
+      <line id="hour-hand"   x1="130" y1="130" x2="130" y2="60"  stroke="#1e1e3a" stroke-width="8"  stroke-linecap="round"/>
+      <line id="minute-hand" x1="130" y1="130" x2="130" y2="30"  stroke="#ff6b35" stroke-width="5"  stroke-linecap="round"/>
+      <line id="second-hand" x1="130" y1="150" x2="130" y2="35"  stroke="#ff3333" stroke-width="2"  stroke-linecap="round"/>
+
+      <!-- Center cap -->
+      <circle cx="130" cy="130" r="7" fill="#1e1e3a"/>
+      <circle cx="130" cy="130" r="3.5" fill="#ffce3a"/>
+
+      <!-- Invisible drag targets -->
+      <circle id="hour-drag"   cx="130" cy="60"  r="18" fill="transparent" style="cursor:grab"/>
+      <circle id="minute-drag" cx="130" cy="30"  r="18" fill="transparent" style="cursor:grab"/>
+    </svg>
+    <div class="drag-hint">👆 Raahaa viisaria tai…</div>
+    <button class="now-btn" id="now-btn">🕐 Aseta nykyinen aika</button>
+  </div>
+
+  <!-- Digitaalinen kello -->
+  <div class="card">
+    <div class="card-title">💻 Digitaalinen kello</div>
+    <div class="digital-display" id="digital-display">
+      <span id="digital-h">12</span>
+      <span class="digital-sep">:</span>
+      <span id="digital-m">00</span>
+      <div class="digital-label">tunnit</div>
+      <div></div>
+      <div class="digital-label">minuutit</div>
+    </div>
+  </div>
+
+  <!-- Vuorokaudenaika -->
+  <div class="card">
+    <div class="card-title">🌅 Vuorokaudenaika</div>
+    <div class="tod-badge" id="tod-badge">
+      <span class="tod-emoji" id="tod-emoji">☀️</span>
+      <span id="tod-text">päivä</span>
+    </div>
+  </div>
+
+  <!-- Sanamuoto -->
+  <div class="card" style="grid-column: 1 / -1;">
+    <div class="card-title">💬 Sanottuna</div>
+    <div class="spoken-time" id="spoken-time">Klo kaksitoista</div>
+  </div>
+
+</div>
+
+<script>
+// ---- Stars ----
+const starsEl = document.getElementById('stars');
+for (let i = 0; i < 80; i++) {
+  const s = document.createElement('div');
+  s.className = 'star';
+  const size = Math.random() * 2.5 + 1;
+  s.style.cssText = `width:${size}px;height:${size}px;top:${Math.random()*100}%;left:${Math.random()*100}%;animation-delay:${Math.random()*2}s;animation-duration:${1.5+Math.random()*2}s`;
+  starsEl.appendChild(s);
+}
+
+// ---- Clock face setup ----
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const CX = 130, CY = 130;
+
+function svgEl(tag, attrs) {
+  const el = document.createElementNS(SVG_NS, tag);
+  for (const [k,v] of Object.entries(attrs)) el.setAttribute(k, v);
+  return el;
+}
+
+// Draw small tick dots for non-5-min positions
+const minGroup = document.getElementById('minute-markers');
+for (let i = 0; i < 60; i++) {
+  if (i % 5 === 0) continue; // 5-min positions use number labels instead
+  const a = (i / 60) * 2 * Math.PI - Math.PI/2;
+  const x = CX + 113 * Math.cos(a);
+  const y = CY + 113 * Math.sin(a);
+  minGroup.appendChild(svgEl('circle', { cx: x, cy: y, r: 1.2, fill: '#c8bfa8' }));
+}
+
+// Draw minute labels: 5, 10, ..., 60 on outer ring
+const minLabelGroup = document.getElementById('minute-labels');
+for (let i = 5; i <= 60; i += 5) {
+  const a = (i / 60) * 2 * Math.PI - Math.PI/2;
+  const x = CX + 108 * Math.cos(a);
+  const y = CY + 108 * Math.sin(a);
+  const t = svgEl('text', { x, y, 'text-anchor': 'middle', 'dominant-baseline': 'central',
+    'font-family': 'Nunito, sans-serif', 'font-size': '9', 'font-weight': '700', fill: '#7a9abf' });
+  t.textContent = i;
+  minLabelGroup.appendChild(t);
+}
+
+// Draw 12h numbers at middle ring
+const numGroup = document.getElementById('numbers');
+for (let i = 1; i <= 12; i++) {
+  const a = (i / 12) * 2 * Math.PI - Math.PI/2;
+  const x = CX + 84 * Math.cos(a);
+  const y = CY + 84 * Math.sin(a);
+  const t = svgEl('text', { x, y, 'text-anchor': 'middle', 'dominant-baseline': 'central',
+    'font-family': 'Baloo 2, cursive', 'font-size': '16', 'font-weight': '700', fill: '#1e1e3a' });
+  t.textContent = i;
+  numGroup.appendChild(t);
+}
+
+// Draw 24h (military time) numbers on inner ring
+for (let i = 13; i <= 24; i++) {
+  const h12 = i === 24 ? 12 : i - 12;
+  const a = (h12 / 12) * 2 * Math.PI - Math.PI/2;
+  const x = CX + 63 * Math.cos(a);
+  const y = CY + 63 * Math.sin(a);
+  const t = svgEl('text', { x, y, 'text-anchor': 'middle', 'dominant-baseline': 'central',
+    'font-family': 'Nunito, sans-serif', 'font-size': '8.5', 'font-weight': '700', fill: '#9977bb' });
+  t.textContent = i;
+  numGroup.appendChild(t);
+}
+
+// ---- State ----
+let hours = 12, minutes = 0, seconds = 0;
+let secondsInterval;
+
+function setTime(h, m, s = 0) {
+  hours = ((h % 12) + 12) % 12;
+  minutes = ((m % 60) + 60) % 60;
+  seconds = ((s % 60) + 60) % 60;
+  render();
+}
+
+function render() {
+  // Analog hands
+  const hDeg = (hours / 12) * 360 + (minutes / 60) * 30 + (seconds / 3600) * 30;
+  const mDeg = (minutes / 60) * 360 + (seconds / 60) * 6;
+  const sDeg = (seconds / 60) * 360;
+
+  setHand('hour-hand',   hDeg, 70);
+  setHand('minute-hand', mDeg, 100);
+  setHand('second-hand', sDeg, 42);
+
+  // Move drag targets
+  const hRad = (hDeg - 90) * Math.PI / 180;
+  const mRad = (mDeg - 90) * Math.PI / 180;
+  document.getElementById('hour-drag').setAttribute('cx', CX + 70 * Math.cos(hRad));
+  document.getElementById('hour-drag').setAttribute('cy', CY + 70 * Math.sin(hRad));
+  document.getElementById('minute-drag').setAttribute('cx', CX + 100 * Math.cos(mRad));
+  document.getElementById('minute-drag').setAttribute('cy', CY + 100 * Math.sin(mRad));
+
+  // Digital
+  const dH = document.getElementById('digital-display');
+  const intH = Math.floor(((dH._fullH !== undefined ? dH._fullH : 12) % 24 + 24) % 24);
+  document.getElementById('digital-h').textContent = String(intH).padStart(2, '0');
+  document.getElementById('digital-m').textContent = String(minutes).padStart(2, '0');
+
+  // Spoken
+  document.getElementById('spoken-time').innerHTML = buildSpoken();
+  // ToD
+  updateToD();
+}
+
+function setHand(id, deg, tipR) {
+  const rad = (deg - 90) * Math.PI / 180;
+  const el = document.getElementById(id);
+  const tipX = CX + tipR * Math.cos(rad);
+  const tipY = CY + tipR * Math.sin(rad);
+  // tail for second hand
+  if (id === 'second-hand') {
+    const tailRad = rad + Math.PI;
+    const tx = CX + 20 * Math.cos(tailRad);
+    const ty = CY + 20 * Math.sin(tailRad);
+    el.setAttribute('x1', tx); el.setAttribute('y1', ty);
+  }
+  el.setAttribute('x2', tipX); el.setAttribute('y2', tipY);
+}
+
+// ---- Spoken time builder ----
+const nums = ['nolla','yksi','kaksi','kolme','neljä','viisi','kuusi','seitsemän','kahdeksan','yhdeksän','kymmenen','yksitoista','kaksitoista',
+  'kolmetoista','neljätoista','viisitoista','kuusitoista','seitsemäntoista','kahdeksantoista','yhdeksäntoista','kaksikymmentä',
+  'kaksikymmentäyksi','kaksikymmentäkaksi','kaksikymmentäkolme','kaksikymmentäneljä','kaksikymmentäviisi','kaksikymmentäkuusi',
+  'kaksikymmentäseitsemän','kaksikymmentäkahdeksan','kaksikymmentäyhdeksän','kolmekymmentä',
+  'kolmekymmentäyksi','kolmekymmentäkaksi','kolmekymmentäkolme','kolmekymmentäneljä','kolmekymmentäviisi','kolmekymmentäkuusi',
+  'kolmekymmentäseitsemän','kolmekymmentäkahdeksan','kolmekymmentäyhdeksän','neljäkymmentä',
+  'neljäkymmentäyksi','neljäkymmentäkaksi','neljäkymmentäkolme','neljäkymmentäneljä','neljäkymmentäviisi','neljäkymmentäkuusi',
+  'neljäkymmentäseitsemän','neljäkymmentäkahdeksan','neljäkymmentäyhdeksän','viisikymmentä',
+  'viisikymmentäyksi','viisikymmentäkaksi','viisikymmentäkolme','viisikymmentäneljä','viisikymmentäviisi','viisikymmentäkuusi',
+  'viisikymmentäseitsemän','viisikymmentäkahdeksan','viisikymmentäyhdeksän'];
+
+// Partitive forms for "X minuuttia"
+const numsPartitive = ['nolla','yhden','kahden','kolmen','neljän','viiden','kuuden','seitsemän','kahdeksan','yhdeksän','kymmenen',
+  'yhdentoista','kahdentoista','kolmentoista','neljäntoista','viidentoista','kuudentoista','seitsemäntoista','kahdeksantoista','yhdeksäntoista','kahdenkymmenen',
+  'kahdenkymmenenyhden','kahdenkymmenenkahdun','kahdenkymmenenkolmen','kahdenkymmenenneliän','kahdenkymmenenviiden',
+  'kahdenkymmenenkuluun','kahdenkymmenensettemän','kahdenkymmenenkahdeksan','kahdenkymmenetenyhdeksän','kolmenkymmenen',
+  'kolmenkymmenenyhden','kolmenkymmenenkahdun','kolmenkymmenenkolmen',
+  'kolmenkymmeneneljän','kolmenkymmenenviiden','kolmenkymmenenkuluun','kolmenkymmenensettemän','kolmenkymmenenkahdeksan','kolmenkymmenenyhdeksän','neljänkymmenen',
+  'neljänkymmenenyhden','neljänkymmenenkahdun','neljänkymmenenkolmen','neljänkymmeneneljän','neljänkymmenenviiden',
+  'neljänkymmenenkuluun','neljänkymmenensettemän','neljänkymmenenkahdeksan','neljänkymmenenyhdeksän','viidentymmenen',
+  'viidentymmeenyhden','viidentymmeenkahdun','viidentymmeenkolmen','viidentymmeeneljän','viidentymmeenviiden',
+  'viidentymmeenkuluun','viidentymmeensettemän','viidentymmeenkahdeksan','viidentymmenyhdeksän'];
+
+// Hour names (partitive for "yli/vaille")
+const hourNames12 = ['kahdentoista','yhden','kahden','kolmen','neljän','viiden','kuuden','seitsemän','kahdeksan','yhdeksän','kymmenen','yhdentoista','kahdentoista'];
+const hourNamesNom = ['kaksitoista','yksi','kaksi','kolme','neljä','viisi','kuusi','seitsemän','kahdeksan','yhdeksän','kymmenen','yksitoista','kaksitoista'];
+
+function buildSpoken() {
+  const fullH = Math.floor(((document.getElementById('digital-display')._fullH || 12) % 24 + 24) % 24);
+  const h12 = ((fullH % 12) + 12) % 12 || 12;
+  const m = minutes;
+
+  let parts = [];
+
+  if (m === 0) {
+    // Tasatunti
+    parts = [`tasan`, `<span class="highlight">${hourNamesNom[h12]}</span>`];
+  } else if (m === 15) {
+    parts = [`<span class="highlight2">vartin yli</span>`, `<span class="highlight">${hourNamesNom[h12]}</span>`];
+  } else if (m === 30) {
+    const nextH = (h12 % 12) + 1;
+    parts = [`puoli`, `<span class="highlight">${hourNamesNom[nextH]}</span>`];
+  } else if (m === 45) {
+    const nextH = (h12 % 12) + 1;
+    parts = [`<span class="highlight2">varttia vaille</span>`, `<span class="highlight">${hourNamesNom[nextH]}</span>`];
+  } else if (m < 30) {
+    // Yli
+    const minWord = m === 1 ? 'minuutti' : 'minuuttia';
+    parts = [`<span class="highlight2">${nums[m]} ${minWord} yli</span>`, `<span class="highlight">${hourNamesNom[h12]}</span>`];
+  } else {
+    // Vaille
+    const toGo = 60 - m;
+    const nextH = (h12 % 12) + 1;
+    const minWord = toGo === 1 ? 'minuutti' : 'minuuttia';
+    parts = [`<span class="highlight2">${nums[toGo]} ${minWord} vaille</span>`, `<span class="highlight">${hourNamesNom[nextH]}</span>`];
+  }
+
+  return parts.join(' ');
+}
+
+// ---- Time of day ----
+const todConfig = [
+  { name: 'yö',        emoji: '🌑', from:  0, to:  5, cls: 'yö',        bg: '#1a1a4e' },
+  { name: 'aamuyö',    emoji: '🌙', from:  1, to:  5, cls: 'aamuyö',    bg: '#2d1b69' },
+  { name: 'aamu',      emoji: '🌅', from:  5, to:  9, cls: 'aamu',      bg: '#ff9a3c' },
+  { name: 'aamupäivä', emoji: '🌤️', from:  9, to: 12, cls: 'aamupäivä', bg: '#87ceeb' },
+  { name: 'päivä',     emoji: '☀️', from: 12, to: 17, cls: 'päivä',     bg: '#4fc3f7' },
+  { name: 'iltapäivä', emoji: '🌞', from: 14, to: 18, cls: 'iltapäivä', bg: '#64b5f6' },
+  { name: 'ilta',      emoji: '🌆', from: 18, to: 22, cls: 'ilta',      bg: '#ff6b6b' },
+  { name: 'yö',        emoji: '🌑', from: 22, to: 24, cls: 'yö',        bg: '#1a1a4e' },
+];
+
+const todColors = {
+  'yö':        { bg: 'linear-gradient(135deg,#1a1a4e,#3a2a6e)', text: '#fff' },
+  'aamuyö':    { bg: 'linear-gradient(135deg,#2d1b69,#4a237e)', text: '#fff' },
+  'aamu':      { bg: 'linear-gradient(135deg,#ff6b35,#ffce3a)', text: '#fff' },
+  'aamupäivä': { bg: 'linear-gradient(135deg,#64b5f6,#29b6f6)', text: '#fff' },
+  'päivä':     { bg: 'linear-gradient(135deg,#29b6f6,#0288d1)', text: '#fff' },
+  'iltapäivä': { bg: 'linear-gradient(135deg,#42a5f5,#1e88e5)', text: '#fff' },
+  'ilta':      { bg: 'linear-gradient(135deg,#ef5350,#e91e63)', text: '#fff' },
+};
+
+function updateToD() {
+  const raw = document.getElementById('digital-display')._fullH;
+  if (raw === undefined) return;
+  const h = Math.floor(((raw % 24) + 24) % 24);
+
+  let tod;
+  if (h >= 0  && h < 1)  tod = 'yö';
+  else if (h >= 1 && h < 5)  tod = 'aamuyö';
+  else if (h >= 5 && h < 9)  tod = 'aamu';
+  else if (h >= 9 && h < 12) tod = 'aamupäivä';
+  else if (h >= 12 && h < 14) tod = 'päivä';
+  else if (h >= 14 && h < 18) tod = 'iltapäivä';
+  else if (h >= 18 && h < 22) tod = 'ilta';
+  else tod = 'yö';
+
+  const emojis = { 'yö':'🌑','aamuyö':'🌙','aamu':'🌅','aamupäivä':'🌤️','päivä':'☀️','iltapäivä':'🌞','ilta':'🌆' };
+  document.getElementById('tod-text').textContent = tod;
+  document.getElementById('tod-emoji').textContent = emojis[tod] || '🕐';
+  const badge = document.getElementById('tod-badge');
+  badge.style.background = todColors[tod]?.bg || '#64b5f6';
+
+  // Body sky class
+  document.body.className = tod;
+}
+
+// ---- Now button ----
+document.getElementById('now-btn').addEventListener('click', () => {
+  clearInterval(secondsInterval);
+  const now = new Date();
+  const dH = document.getElementById('digital-display');
+  dH._fullH = now.getHours();
+  setTime(now.getHours(), now.getMinutes(), now.getSeconds());
+  // Tick seconds
+  secondsInterval = setInterval(() => {
+    const n = new Date();
+    const dH2 = document.getElementById('digital-display');
+    dH2._fullH = n.getHours();
+    setTime(n.getHours(), n.getMinutes(), n.getSeconds());
+  }, 1000);
+});
+
+// ---- Drag logic ----
+const svgEl2 = document.getElementById('clock-svg');
+let dragging = null;   // 'hour' | 'minute'
+let lastAngle = null;  // previous angle during drag (degrees 0-360)
+let minuteAccum = 0;   // accumulated raw minutes for smooth 5-min snapping
+
+function getSVGPos(e) {
+  const rect = svgEl2.getBoundingClientRect();
+  const scaleX = 260 / rect.width;
+  const scaleY = 260 / rect.height;
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  return {
+    x: (clientX - rect.left) * scaleX,
+    y: (clientY - rect.top)  * scaleY,
+  };
+}
+
+function getAngle(x, y) {
+  let a = Math.atan2(y - CY, x - CX) * 180 / Math.PI + 90;
+  if (a < 0) a += 360;
+  return a;
+}
+
+function startDrag(type, e) {
+  clearInterval(secondsInterval);
+  dragging = type;
+  const pos = getSVGPos(e);
+  lastAngle = getAngle(pos.x, pos.y);
+  if (type === 'minute') minuteAccum = minutes; // seed from current value
+}
+
+document.getElementById('hour-drag').addEventListener('mousedown',   (e) => startDrag('hour', e));
+document.getElementById('minute-drag').addEventListener('mousedown', (e) => startDrag('minute', e));
+document.getElementById('hour-drag').addEventListener('touchstart',   (e) => { e.preventDefault(); startDrag('hour', e); },   { passive: false });
+document.getElementById('minute-drag').addEventListener('touchstart', (e) => { e.preventDefault(); startDrag('minute', e); }, { passive: false });
+
+function onMove(e) {
+  if (!dragging) return;
+  if (e.cancelable) e.preventDefault();
+  const pos = getSVGPos(e);
+  const angle = getAngle(pos.x, pos.y);
+
+  // Delta angle (shortest path, -180..+180)
+  let delta = angle - lastAngle;
+  if (delta > 180)  delta -= 360;
+  if (delta < -180) delta += 360;
+  lastAngle = angle;
+
+  const dH = document.getElementById('digital-display');
+  if (dH._fullH === undefined) dH._fullH = 12;
+
+  if (dragging === 'hour') {
+    // Hour hand: 360° = 12 h → 1° = 1/30 h
+    let newFullH = dH._fullH + delta / 30;
+    newFullH = ((newFullH % 24) + 24) % 24;
+    dH._fullH = newFullH;
+    setTime(newFullH, minutes, 0);
+  } else {
+    // Minute hand: 360° = 60 min → 1° = 1/6 min, snap to 5-min steps
+    minuteAccum += delta / 6;
+
+    // Handle full rotations (advance/retreat hour on wrap)
+    let hourDelta = 0;
+    while (minuteAccum >= 60) { minuteAccum -= 60; hourDelta++; }
+    while (minuteAccum < 0)   { minuteAccum += 60; hourDelta--; }
+
+    if (hourDelta !== 0) {
+      dH._fullH = ((dH._fullH + hourDelta) % 24 + 24) % 24;
+    }
+
+    // Snap to nearest 5 minutes
+    const snapped = Math.round(minuteAccum / 5) * 5 % 60;
+    setTime(dH._fullH, snapped, 0);
+  }
+}
+
+function onEnd() { dragging = null; lastAngle = null; }
+
+document.addEventListener('mousemove', onMove);
+document.addEventListener('touchmove',  onMove, { passive: false });
+document.addEventListener('mouseup',   onEnd);
+document.addEventListener('touchend',  onEnd);
+
+// ---- AM/PM toggle (click face) ----
+svgEl2.addEventListener('dblclick', () => {
+  clearInterval(secondsInterval);
+  const dH = document.getElementById('digital-display');
+  const fh = dH._fullH !== undefined ? dH._fullH : 12;
+  const newFH = fh < 12 ? fh + 12 : fh - 12;
+  dH._fullH = newFH;
+  setTime(newFH, minutes, seconds);
+});
+
+// ---- Init ----
+(function init() {
+  const dH = document.getElementById('digital-display');
+  dH._fullH = 12;
+  setTime(12, 0, 0);
+
+  // AM/PM hint
+  const hint = document.querySelector('.drag-hint');
+  hint.title = 'Kaksoisnapauta kellotaulua vaihtaaksesi aamu/ilta';
+})();
+</script>
+</body>
+</html>
