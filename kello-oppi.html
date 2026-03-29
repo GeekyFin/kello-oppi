@@ -563,7 +563,8 @@ document.getElementById('now-btn').addEventListener('click', () => {
 const svgEl2 = document.getElementById('clock-svg');
 let dragging = null;   // 'hour' | 'minute'
 let lastAngle = null;  // previous angle during drag (degrees 0-360)
-let minuteAccum = 0;   // accumulated raw minutes for smooth 5-min snapping
+let minuteAccum = 0;   // accumulated raw minutes for 5-min snapping
+let hourAccum   = 0;   // accumulated raw hours for 1-hour snapping
 
 function getSVGPos(e) {
   const rect = svgEl2.getBoundingClientRect();
@@ -588,7 +589,9 @@ function startDrag(type, e) {
   dragging = type;
   const pos = getSVGPos(e);
   lastAngle = getAngle(pos.x, pos.y);
-  if (type === 'minute') minuteAccum = minutes; // seed from current value
+  const dH = document.getElementById('digital-display');
+  if (type === 'minute') minuteAccum = minutes;
+  if (type === 'hour')   hourAccum   = (((dH._fullH !== undefined ? dH._fullH : 12) % 24) + 24) % 24;
 }
 
 document.getElementById('hour-drag').addEventListener('mousedown',   (e) => startDrag('hour', e));
@@ -612,11 +615,13 @@ function onMove(e) {
   if (dH._fullH === undefined) dH._fullH = 12;
 
   if (dragging === 'hour') {
-    // Hour hand: 360° = 12 h → 1° = 1/30 h
-    let newFullH = dH._fullH + delta / 30;
-    newFullH = ((newFullH % 24) + 24) % 24;
-    dH._fullH = newFullH;
-    setTime(newFullH, minutes, 0);
+    // Hour hand: 360° = 12 h → 1° = 1/30 h, snap to whole hours
+    hourAccum += delta / 30;
+    while (hourAccum >= 24) hourAccum -= 24;
+    while (hourAccum <  0)  hourAccum += 24;
+    const snappedH = Math.round(hourAccum) % 24;
+    dH._fullH = snappedH;
+    setTime(snappedH, minutes, 0);
   } else {
     // Minute hand: 360° = 60 min → 1° = 1/6 min, snap to 5-min steps
     minuteAccum += delta / 6;
